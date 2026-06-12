@@ -1,0 +1,419 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  MANAGER
+  LOAN_OFFICER
+  COLLECTIONS_OFFICER
+  ACCOUNTANT
+}
+
+enum LoanType {
+  STUDENT
+  CAMPUS
+  BUSINESS
+  SHORT_TERM
+  ASSET_BACKED
+}
+
+enum LoanStatus {
+  PENDING
+  APPROVED
+  ACTIVE
+  PAID
+  OVERDUE
+  DEFAULT
+  REJECTED
+  CANCELLED
+}
+
+enum RepaymentFrequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum AssetType {
+  SMARTPHONE
+  LAPTOP
+  TABLET
+  GAMING_CONSOLE
+  ELECTRONICS
+  EQUIPMENT
+  OTHER
+}
+
+enum AssetCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+}
+
+enum CollateralStatus {
+  HELD
+  RELEASED
+  AUCTIONED
+  LOST
+}
+
+enum ScheduleStatus {
+  PENDING
+  PAID
+  PARTIAL
+  OVERDUE
+}
+
+enum PaymentMethod {
+  CASH
+  MOBILE_MONEY
+  BANK_TRANSFER
+  CHEQUE
+}
+
+enum DocumentType {
+  NRC_FRONT
+  NRC_BACK
+  PASSPORT_PHOTO
+  PROOF_OF_RESIDENCE
+  STUDENT_CARD
+  BUSINESS_LICENSE
+  COLLATERAL_PHOTO
+  LOAN_AGREEMENT
+  OTHER
+}
+
+enum NotificationType {
+  SMS
+  EMAIL
+  WHATSAPP
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum ClientStatus {
+  ACTIVE
+  BLACKLISTED
+  INACTIVE
+}
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        UserRole  @default(LOAN_OFFICER)
+  branchId    String?
+  isActive    Boolean   @default(true)
+  mfaEnabled  Boolean   @default(false)
+  lastLogin   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sessions    Session[]
+  auditLogs   AuditLog[]
+  loans       Loan[]     @relation("LoanOfficer")
+  approvedLoans Loan[]   @relation("Approver")
+  payments    Payment[]
+  notes       ClientNote[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Client {
+  id               String       @id @default(cuid())
+  clientCode       String       @unique
+  firstName        String
+  lastName         String
+  nrcNumber        String       @unique
+  studentId        String?
+  university       String?
+  phone            String
+  whatsapp         String?
+  email            String?
+  address          String
+  district         String?
+  province         String?
+  dateOfBirth      DateTime?
+  gender           String?
+  occupation       String?
+  employerName     String?
+  employerPhone    String?
+  salary           Decimal?     @db.Decimal(15, 2)
+  payDate          Int?
+  businessName     String?
+  businessType     String?
+  marketLocation   String?
+  monthlyRevenue   Decimal?     @db.Decimal(15, 2)
+  yearsOperating   Int?
+  internalScore    Int?
+  reliabilityRating Int?
+  status           ClientStatus @default(ACTIVE)
+  createdBy        String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  loans            Loan[]
+  collateral       Collateral[]
+  documents        Document[]
+  notes            ClientNote[]
+  payments         Payment[]
+  notifications    Notification[]
+}
+
+model Collateral {
+  id               String          @id @default(cuid())
+  vaultId          String          @unique
+  clientId         String
+  loanId           String?
+  assetType        AssetType
+  brand            String
+  model            String
+  serialNumber     String?
+  imei             String?
+  color            String?
+  condition        AssetCondition
+  marketValue      Decimal         @db.Decimal(15, 2)
+  forcedSaleValue  Decimal         @db.Decimal(15, 2)
+  loanToValueRatio Decimal         @db.Decimal(5, 2)
+  shelfNumber      String?
+  vaultPosition    String?
+  lockerNumber     String?
+  status           CollateralStatus @default(HELD)
+  heldAt           DateTime?
+  releasedAt       DateTime?
+  createdBy        String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  client           Client          @relation(fields: [clientId], references: [id])
+  loan             Loan?           @relation(fields: [loanId], references: [id])
+  documents        Document[]
+  movements        CollateralMovement[]
+}
+
+model CollateralMovement {
+  id           String     @id @default(cuid())
+  collateralId String
+  action       String
+  fromStatus   String?
+  toStatus     String?
+  notes        String?
+  performedBy  String?
+  performedAt  DateTime   @default(now())
+
+  collateral   Collateral @relation(fields: [collateralId], references: [id])
+}
+
+model Loan {
+  id                  String             @id @default(cuid())
+  loanNumber          String             @unique
+  clientId            String
+  loanOfficerId       String?
+  branchId            String?
+  loanType            LoanType
+  principal           Decimal            @db.Decimal(15, 2)
+  interestRate        Decimal            @db.Decimal(5, 2)
+  processingFee       Decimal            @db.Decimal(15, 2)
+  totalInterest       Decimal            @db.Decimal(15, 2)
+  totalAmount         Decimal            @db.Decimal(15, 2)
+  disbursedAmount     Decimal            @db.Decimal(15, 2) @default(0)
+  outstandingBalance  Decimal            @db.Decimal(15, 2)
+  repaymentFrequency  RepaymentFrequency @default(MONTHLY)
+  durationMonths      Int
+  startDate           DateTime?
+  endDate             DateTime?
+  nextDueDate         DateTime?
+  status              LoanStatus         @default(PENDING)
+  approvedById        String?
+  approvedAt          DateTime?
+  disbursedAt         DateTime?
+  notes               String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  client              Client             @relation(fields: [clientId], references: [id])
+  loanOfficer         User?              @relation("LoanOfficer", fields: [loanOfficerId], references: [id])
+  approvedBy          User?              @relation("Approver", fields: [approvedById], references: [id])
+  collateral          Collateral[]
+  schedule            LoanSchedule[]
+  payments            Payment[]
+  documents           Document[]
+  penalties           Penalty[]
+  notifications       Notification[]
+}
+
+model LoanSchedule {
+  id                String         @id @default(cuid())
+  loanId            String
+  installmentNumber Int
+  dueDate           DateTime
+  principalAmount   Decimal        @db.Decimal(15, 2)
+  interestAmount    Decimal        @db.Decimal(15, 2)
+  totalAmount       Decimal        @db.Decimal(15, 2)
+  paidAmount        Decimal        @db.Decimal(15, 2) @default(0)
+  balance           Decimal        @db.Decimal(15, 2)
+  status            ScheduleStatus @default(PENDING)
+  paidAt            DateTime?
+  createdAt         DateTime       @default(now())
+
+  loan              Loan           @relation(fields: [loanId], references: [id])
+  payments          Payment[]
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  paymentNumber    String        @unique
+  loanId           String
+  clientId         String
+  loanScheduleId   String?
+  amount           Decimal       @db.Decimal(15, 2)
+  principalPaid    Decimal       @db.Decimal(15, 2) @default(0)
+  interestPaid     Decimal       @db.Decimal(15, 2) @default(0)
+  penaltyPaid      Decimal       @db.Decimal(15, 2) @default(0)
+  paymentMethod    PaymentMethod @default(CASH)
+  referenceNumber  String?
+  notes            String?
+  recordedById     String?
+  paymentDate      DateTime
+  createdAt        DateTime      @default(now())
+
+  loan             Loan          @relation(fields: [loanId], references: [id])
+  client           Client        @relation(fields: [clientId], references: [id])
+  loanSchedule     LoanSchedule? @relation(fields: [loanScheduleId], references: [id])
+  recordedBy       User?         @relation(fields: [recordedById], references: [id])
+}
+
+model Penalty {
+  id             String   @id @default(cuid())
+  loanId         String
+  loanScheduleId String?
+  amount         Decimal  @db.Decimal(15, 2)
+  reason         String?
+  isPaid         Boolean  @default(false)
+  paidAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  loan           Loan     @relation(fields: [loanId], references: [id])
+}
+
+model Document {
+  id            String       @id @default(cuid())
+  clientId      String?
+  loanId        String?
+  collateralId  String?
+  type          DocumentType
+  url           String
+  fileName      String
+  fileSize      Int?
+  uploadedById  String?
+  uploadedAt    DateTime     @default(now())
+
+  client        Client?      @relation(fields: [clientId], references: [id])
+  loan          Loan?        @relation(fields: [loanId], references: [id])
+  collateral    Collateral?  @relation(fields: [collateralId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  tableName  String?
+  recordId   String?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String             @id @default(cuid())
+  userId    String?
+  clientId  String?
+  loanId    String?
+  type      NotificationType
+  title     String
+  message   String
+  status    NotificationStatus @default(PENDING)
+  sentAt    DateTime?
+  createdAt DateTime           @default(now())
+
+  client    Client?            @relation(fields: [clientId], references: [id])
+  loan      Loan?              @relation(fields: [loanId], references: [id])
+}
+
+model Investor {
+  id             String   @id @default(cuid())
+  name           String
+  phone          String?
+  email          String?
+  amount         Decimal  @db.Decimal(15, 2)
+  returnRate     Decimal  @db.Decimal(5, 2)
+  startDate      DateTime
+  endDate        DateTime?
+  monthlyEarnings Decimal @db.Decimal(15, 2)
+  capitalBalance Decimal  @db.Decimal(15, 2)
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Expense {
+  id           String   @id @default(cuid())
+  category     String
+  description  String
+  amount       Decimal  @db.Decimal(15, 2)
+  date         DateTime
+  receiptUrl   String?
+  recordedById String?
+  createdAt    DateTime @default(now())
+}
+
+model ClientNote {
+  id           String    @id @default(cuid())
+  clientId     String
+  content      String
+  type         String    @default("GENERAL")
+  followUpDate DateTime?
+  createdById  String?
+  createdAt    DateTime  @default(now())
+
+  client       Client    @relation(fields: [clientId], references: [id])
+  createdBy    User?     @relation(fields: [createdById], references: [id])
+}
+
+model SystemConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+}
