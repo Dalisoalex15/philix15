@@ -1,8 +1,11 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, Briefcase, Shield, CreditCard,
-  AlertTriangle, BarChart3, DollarSign, Settings, UserCog,
-  ChevronLeft, ChevronRight, Building2, LogOut, TrendingUp
+  LayoutDashboard, Users, Briefcase, Shield, CreditCard, AlertTriangle,
+  BarChart3, Settings, UserCog, ChevronLeft, ChevronRight, LogOut,
+  TrendingUp, Activity, Wallet, PiggyBank, Receipt, TrendingDown,
+  Award, ShieldAlert, Crown, Package, Megaphone, Mail, MessageSquare,
+  FileText, CheckSquare, BookOpen, ScrollText, Building2, Server,
+  Calculator, Unlock, DollarSign, Bell
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -10,17 +13,105 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useState } from 'react'
 
-const navItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/clients', label: 'Clients', icon: Users },
-  { path: '/loans', label: 'Loans', icon: Briefcase },
-  { path: '/collateral', label: 'Collateral Vault', icon: Shield },
-  { path: '/payments', label: 'Payments', icon: CreditCard },
-  { path: '/collections', label: 'Collections', icon: AlertTriangle },
-  { path: '/reports', label: 'Reports', icon: BarChart3 },
-  { path: '/accounting', label: 'Accounting', icon: DollarSign },
-  { path: '/users', label: 'User Management', icon: UserCog, adminOnly: true },
-  { path: '/settings', label: 'Settings', icon: Settings },
+type NavItem = {
+  path: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  roles?: string[]
+}
+
+type NavSection = {
+  label: string
+  items: NavItem[]
+}
+
+const navSections: NavSection[] = [
+  {
+    label: 'Main',
+    items: [
+      { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { path: '/clients', label: 'Clients', icon: Users },
+      { path: '/loans', label: 'Loans', icon: Briefcase },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { path: '/ops/daily', label: 'Daily Operations', icon: Activity },
+      { path: '/collections', label: 'Collections', icon: AlertTriangle },
+      { path: '/ops/cashflow', label: 'Cash Flow', icon: TrendingUp, roles: ['SUPER_ADMIN', 'MANAGER', 'ACCOUNTANT'] },
+      { path: '/ops/reminders', label: 'Reminders', icon: Bell },
+    ],
+  },
+  {
+    label: 'Collateral Vault',
+    items: [
+      { path: '/collateral', label: 'Vault Inventory', icon: Shield },
+      { path: '/collateral/assess', label: 'Assessment', icon: Calculator },
+      { path: '/collateral/release', label: 'Release Queue', icon: Unlock, roles: ['SUPER_ADMIN', 'MANAGER'] },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      { path: '/payments', label: 'Payments', icon: CreditCard },
+      { path: '/finance/expenses', label: 'Expenses', icon: Receipt, roles: ['SUPER_ADMIN', 'MANAGER', 'ACCOUNTANT'] },
+      { path: '/finance/investors', label: 'Investors', icon: PiggyBank, roles: ['SUPER_ADMIN', 'MANAGER', 'ACCOUNTANT'] },
+      { path: '/finance/capital', label: 'Capital Utilization', icon: Wallet, roles: ['SUPER_ADMIN', 'MANAGER'] },
+    ],
+  },
+  {
+    label: 'Analytics',
+    items: [
+      { path: '/reports', label: 'Reports', icon: BarChart3 },
+      { path: '/analytics/par', label: 'PAR Dashboard', icon: TrendingDown, roles: ['SUPER_ADMIN', 'MANAGER'] },
+      { path: '/analytics/staff', label: 'Staff Performance', icon: Award, roles: ['SUPER_ADMIN', 'MANAGER'] },
+      { path: '/analytics/risk', label: 'Risk Scoring', icon: ShieldAlert },
+      { path: '/analytics/executive', label: 'Executive View', icon: Crown, roles: ['SUPER_ADMIN'] },
+    ],
+  },
+  {
+    label: 'Recovery',
+    items: [
+      { path: '/recovery/repossession', label: 'Repossession', icon: Package, roles: ['SUPER_ADMIN', 'MANAGER', 'COLLECTIONS_OFFICER'] },
+    ],
+  },
+  {
+    label: 'Tasks',
+    items: [
+      { path: '/tasks', label: 'My Tasks', icon: CheckSquare },
+    ],
+  },
+  {
+    label: 'Communications',
+    items: [
+      { path: '/comms/announcements', label: 'Announcements', icon: Megaphone },
+      { path: '/comms/emails', label: 'Email Log', icon: Mail, roles: ['SUPER_ADMIN', 'MANAGER'] },
+      { path: '/comms/history', label: 'Comm History', icon: MessageSquare },
+    ],
+  },
+  {
+    label: 'Documents',
+    items: [
+      { path: '/documents/generate', label: 'Document Generator', icon: FileText },
+    ],
+  },
+  {
+    label: 'Knowledge Base',
+    items: [
+      { path: '/wiki', label: 'Internal Wiki', icon: BookOpen },
+    ],
+  },
+  {
+    label: 'Administration',
+    items: [
+      { path: '/admin/audit', label: 'Audit Logs', icon: ScrollText, roles: ['SUPER_ADMIN', 'MANAGER'] },
+      { path: '/admin/branches', label: 'Branches', icon: Building2, roles: ['SUPER_ADMIN'] },
+      { path: '/users', label: 'User Management', icon: UserCog, roles: ['SUPER_ADMIN'] },
+      { path: '/admin/system-health', label: 'System Health', icon: Server, roles: ['SUPER_ADMIN'] },
+      { path: '/settings', label: 'Settings', icon: Settings, roles: ['SUPER_ADMIN', 'MANAGER'] },
+    ],
+  },
 ]
 
 export default function Sidebar() {
@@ -29,12 +120,17 @@ export default function Sidebar() {
   const location = useLocation()
 
   const initials = user?.name
-    ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : 'PF'
+
+  const canView = (roles?: string[]) => {
+    if (!roles) return true
+    return roles.includes(user?.role ?? '')
+  }
 
   return (
     <aside className={cn(
-      'flex flex-col h-screen bg-slate-900 border-r border-slate-700 transition-all duration-300 relative',
+      'flex flex-col h-screen bg-slate-900 border-r border-slate-700 transition-all duration-300 relative shrink-0',
       collapsed ? 'w-16' : 'w-60'
     )}>
       {/* Logo */}
@@ -61,37 +157,45 @@ export default function Sidebar() {
       </button>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-0.5">
-        {!collapsed && (
-          <div className="px-2 mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Navigation</span>
-          </div>
-        )}
-        {navItems.map(({ path, label, icon: Icon, adminOnly }) => {
-          if (adminOnly && user?.role !== 'SUPER_ADMIN') return null
-          const isActive = location.pathname === path || location.pathname.startsWith(path + '/')
+      <nav className="flex-1 overflow-y-auto py-2 px-2 scrollbar-thin">
+        {navSections.map((section) => {
+          const visibleItems = section.items.filter(item => canView(item.roles))
+          if (visibleItems.length === 0) return null
           return (
-            <NavLink
-              key={path}
-              to={path}
-              className={cn(
-                'flex items-center gap-3 px-2 py-2 rounded-md text-sm transition-all group',
-                collapsed ? 'justify-center' : '',
-                isActive
-                  ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-600/30'
-                  : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+            <div key={section.label} className="mb-1">
+              {!collapsed && (
+                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-2 mt-4 mb-1">
+                  {section.label}
+                </div>
               )}
-              title={collapsed ? label : undefined}
-            >
-              <Icon className={cn('shrink-0', collapsed ? 'w-5 h-5' : 'w-4 h-4')} />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </NavLink>
+              {collapsed && <div className="border-t border-slate-800 my-2" />}
+              {visibleItems.map(({ path, label, icon: Icon }) => {
+                const isActive = location.pathname === path || (path !== '/collateral' && path !== '/wiki' && location.pathname.startsWith(path + '/'))
+                return (
+                  <NavLink
+                    key={path}
+                    to={path}
+                    className={cn(
+                      'flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-all',
+                      collapsed ? 'justify-center' : '',
+                      isActive
+                        ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-600/30'
+                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+                    )}
+                    title={collapsed ? label : undefined}
+                  >
+                    <Icon className={cn('shrink-0', collapsed ? 'w-5 h-5' : 'w-4 h-4')} />
+                    {!collapsed && <span className="truncate text-xs">{label}</span>}
+                  </NavLink>
+                )
+              })}
+            </div>
           )
         })}
       </nav>
 
       {/* User section */}
-      <div className={cn('border-t border-slate-700 p-3', collapsed ? 'flex flex-col items-center gap-2' : '')}>
+      <div className={cn('border-t border-slate-700 p-3 shrink-0', collapsed ? 'flex flex-col items-center gap-2' : '')}>
         {!collapsed && (
           <div className="flex items-center gap-2 mb-2 px-1">
             <Avatar className="w-7 h-7">
@@ -99,7 +203,7 @@ export default function Sidebar() {
             </Avatar>
             <div className="flex-1 min-w-0">
               <div className="text-xs font-medium text-slate-200 truncate">{user?.name}</div>
-              <div className="text-xs text-slate-500 truncate">{user?.role}</div>
+              <div className="text-[10px] text-slate-500 truncate">{user?.role?.replace(/_/g, ' ')}</div>
             </div>
           </div>
         )}
@@ -111,7 +215,7 @@ export default function Sidebar() {
           title="Logout"
         >
           <LogOut className="w-4 h-4" />
-          {!collapsed && <span className="ml-2">Logout</span>}
+          {!collapsed && <span className="ml-2 text-xs">Logout</span>}
         </Button>
       </div>
     </aside>
